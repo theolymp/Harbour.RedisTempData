@@ -1,6 +1,10 @@
-﻿using System.Reflection;
+﻿#region usings
+
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+
+#endregion
 
 [assembly: AssemblyTitle("Harbour.RedisTempDataProvider")]
 [assembly: AssemblyConfiguration("")]

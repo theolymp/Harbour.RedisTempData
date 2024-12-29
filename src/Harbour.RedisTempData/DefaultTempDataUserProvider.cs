@@ -1,42 +1,41 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿#region usings
+
+using System;
 using System.Web;
 using System.Web.Mvc;
 using System.Web.SessionState;
 
+#endregion
+
 namespace Harbour.RedisTempData
 {
     /// <summary>
-    /// Provides a default mechanism for identifying the current user.
+    ///     Provides a default mechanism for identifying the current user.
     /// </summary>
+    // ReSharper disable once ClassWithVirtualMembersNeverInherited.Global
     public class DefaultTempDataUserProvider : ITempDataUserProvider
     {
-        public const string DefaultFallbackCookieName = "aid";
-        private const string cachedHttpContextKey = "__DefaultTempDataUserProvider.User";
+        private const string DefaultFallbackCookieName = "aid";
+        private const string CachedHttpContextKey = "__DefaultTempDataUserProvider.User";
 
-        private readonly string fallbackCookieName;
-        private readonly ISessionIDManager sessionIdManager;
+        private readonly string _fallbackCookieName;
+        private readonly ISessionIDManager _sessionIdManager;
 
         public DefaultTempDataUserProvider()
             : this(DefaultFallbackCookieName)
         {
-
         }
 
-        public DefaultTempDataUserProvider(string fallbackCookieName)
+        private DefaultTempDataUserProvider(string fallbackCookieName)
             : this(fallbackCookieName, new SessionIDManager())
         {
-            
         }
 
         // For testing.
-        internal DefaultTempDataUserProvider(string fallbackCookieName, ISessionIDManager sessionIdManager)
+        private DefaultTempDataUserProvider(string fallbackCookieName, ISessionIDManager sessionIdManager)
         {
-            this.fallbackCookieName = fallbackCookieName;
-            this.sessionIdManager = sessionIdManager;
+            this._fallbackCookieName = fallbackCookieName;
+            this._sessionIdManager = sessionIdManager;
         }
 
         public string GetUser(ControllerContext context)
@@ -46,12 +45,10 @@ namespace Harbour.RedisTempData
             var response = httpContext.Response;
 
             // Use the same user for the duration of the request.
-            if (httpContext.Items.Contains(cachedHttpContextKey))
-            {
-                return (string)httpContext.Items[cachedHttpContextKey];
-            }
+            if (httpContext.Items.Contains(CachedHttpContextKey))
+                return (string)httpContext.Items[CachedHttpContextKey];
 
-            var fallbackCookie = request.Cookies[fallbackCookieName];
+            var fallbackCookie = request.Cookies[_fallbackCookieName];
 
             string user;
 
@@ -69,10 +66,10 @@ namespace Harbour.RedisTempData
                     // used for this request because we want to grab the temp
                     // data from the previous request (when the user was 
                     // unauthenticated).
-                    user = fallbackCookie.Value;
+                    user = fallbackCookie?.Value;
 
                     // Expire the cookie since don't need the cookie anymore.
-                    response.Cookies.Add(new HttpCookie(fallbackCookieName)
+                    response.Cookies.Add(new HttpCookie(_fallbackCookieName)
                     {
                         Expires = DateTime.UtcNow.AddYears(-1)
                     });
@@ -90,7 +87,7 @@ namespace Harbour.RedisTempData
             // since new sessions are generated until the session is actually
             // *used*. However, if you're going this route, you should probably
             // be using the default SessionStateTempDataProvider in MVC :).
-            else if (httpContext.Session != null && !httpContext.Session.IsNewSession)
+            else if (!httpContext.Session.IsNewSession)
             {
                 user = httpContext.Session.SessionID;
             }
@@ -98,31 +95,31 @@ namespace Harbour.RedisTempData
             {
                 // The session ID manager is used to generate a secure ID that
                 // is valid for a cookie (no reason to reinvent the wheel!).
-                user = sessionIdManager.CreateSessionID(httpContext.ApplicationInstance.Context);
+                user = _sessionIdManager.CreateSessionID(httpContext.ApplicationInstance.Context);
 
                 // Issue a new cookie identifying the anonymous user.
-                response.Cookies.Add(new HttpCookie(fallbackCookieName, user)
+                response.Cookies.Add(new HttpCookie(_fallbackCookieName, user)
                 {
                     HttpOnly = true
                 });
             }
             else
             {
-                user = fallbackCookie.Value;
+                user = fallbackCookie?.Value;
             }
 
-            httpContext.Items[cachedHttpContextKey] = user;
+            httpContext.Items[CachedHttpContextKey] = user;
             return user;
+        }
+
+        private bool IsValidCookie(HttpCookie cookie)
+        {
+            return cookie != null && _sessionIdManager.Validate(cookie.Value);
         }
 
         protected virtual string GetUserFromContext(HttpContextBase httpContext)
         {
             return httpContext.User.Identity.Name;
-        }
-
-        private bool IsValidCookie(HttpCookie cookie)
-        {
-            return cookie != null && sessionIdManager.Validate(cookie.Value);
         }
     }
 }
